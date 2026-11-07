@@ -1,0 +1,84 @@
+/* hidden属性の要素は必ず非表示にする */
+[hidden] { display: none !important; }
+
+/* レイアウト：黒地の中央に「光の玉＋縦メニュー」を横並び、下部に音のON/OFF（PS2のシステムメニューが参考） */
+:root {
+  color-scheme: dark;
+  --bg: #000000;
+  --fg: #ffffff;
+  --sel: #48a5c6;              /* 選択中（Figma） */
+  --near: #464747;             /* 1つ隣（Figma） */
+  --far: #222222;              /* 2つ以上離れた項目（Figma） */
+  --sel-glow: rgba(72, 165, 198, 0.5);
+  --ui: #6f7477;               /* 下部ボタンの文字 */
+  --ui-on: #cfe3ec;
+  --line: #26292b;
+  --line-on: #2f5b6c;
+  --pixel: "Press Start 2P", ui-monospace, "Courier New", monospace;
+  --body: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --title-size: clamp(16px, 2.78vw, 40px);
+  --menu-size: clamp(18px, 2.78vw, 40px);
+  --ui-size: clamp(10px, 0.9vw, 12px);
+}
+
+html, body { height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--pixel); overflow-x: hidden; }
+
+#orbs { position: fixed; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; z-index: 0; }
+
+.screen {
+  position: relative; z-index: 1; box-sizing: border-box; min-height: 100%;
+  display: grid; grid-template-rows: auto 1fr auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: clamp(24px, 4.7vw, 68px) clamp(20px, 3vw, 40px);
+}
+
+.site-title {
+  margin: 0; padding-left: clamp(0px, calc(3.33vw - 16px), 32px);
+  font-size: var(--title-size); font-weight: 400; line-height: 1; color: var(--fg);
+}
+
+.stage {
+  position: relative; min-width: 0;
+  display: flex; align-items: center; justify-content: center;
+  gap: clamp(28px, 6.3vw, 91px); padding-block: 32px;
+}
+/* 玉の位置と大きさの基準になる見えない箱。WebGL側がこの箱の中心に輪を描く */
+.orb-anchor { flex: none; width: clamp(150px, 14.4vw, 210px); max-width: 100%; aspect-ratio: 1; }
+
+.menu ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--menu-size); }
+.menu a {
+  display: block; font-size: var(--menu-size); line-height: 1; white-space: nowrap;
+  color: var(--far); text-decoration: none; outline: none; -webkit-tap-highlight-color: transparent;
+}
+.menu a[data-dist="1"] { color: var(--near); }
+.menu a[data-dist="0"] { color: var(--sel); }
+.menu a[data-dist="0"]:focus-visible { text-shadow: 0 0 14px var(--sel-glow); }
+.js .menu.pre, .menu.is-hidden { visibility: hidden; }
+
+.page {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 28px; text-align: center;
+}
+.page[hidden] { display: none; }
+.page-title { margin: 0; font-size: var(--menu-size); font-weight: 400; line-height: 1; color: var(--sel); }
+.page-note { margin: 0; font-family: var(--body); font-size: 14px; color: var(--ui); }
+
+.foot { display: flex; justify-content: center; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 12px; padding: 12px 16px;
+  font-family: var(--pixel); font-size: var(--ui-size); letter-spacing: 0.1em; line-height: 1;
+  color: var(--ui); background: transparent; border: 1px solid var(--line); cursor: pointer;
+}
+.btn:hover { color: var(--ui-on); }
+.btn:focus-visible { outline: 2px solid var(--sel); outline-offset: 3px; }
+.sound .lamp { width: 8px; height: 8px; background: var(--line); }
+.sound[aria-pressed="true"] { color: var(--ui-on); border-color: var(--line-on); }
+.sound[aria-pressed="true"] .lamp { background: var(--sel); box-shadow: 0 0 8px var(--sel); }
+
+@media (max-width: 640px) {
+  .stage { flex-direction: column; gap: 36px; }
+  .orb-anchor { width: min(52vw, 200px); }
+}

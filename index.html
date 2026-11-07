@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Omori Portfolio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+  <script>
+    // JSが動く環境では、玉が輪になるまでメニューを隠しておく（読み込みに失敗しても4秒後には必ず表示）
+    document.documentElement.classList.add('js');
+    setTimeout(function () { var m = document.getElementById('menu'); if (m) m.classList.remove('pre'); }, 4000);
+  </script>
+</head>
+<body>
+  <canvas id="orbs" aria-hidden="true"></canvas>
+
+  <div class="screen">
+    <header>
+      <h1 class="site-title">Omori Portfolio</h1>
+    </header>
+
+    <main class="stage">
+      <div class="orb-anchor" id="orb-anchor" aria-hidden="true"></div>
+
+      <nav class="menu pre" id="menu" aria-label="メニュー">
+        <ul>
+          <li><a href="#portfolio" data-key="portfolio" data-dist="0">Portfolio</a></li>
+          <li><a href="#profile" data-key="profile" data-dist="1">Profile</a></li>
+          <li><a href="#contact" data-key="contact" data-dist="2">Contact</a></li>
+        </ul>
+      </nav>
+
+      <!-- 決定後に出る仮の画面。各ページができたら差し替える -->
+      <section class="page" id="page" hidden aria-labelledby="page-title">
+        <h2 class="page-title" id="page-title">Portfolio</h2>
+        <p class="page-note">このページの中身はこれから作ります（Escで戻る）</p>
+        <button class="btn" id="back-btn" type="button">BACK</button>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <button class="btn sound" id="sound-btn" type="button" aria-pressed="false">
+        <span class="lamp" aria-hidden="true"></span><span id="sound-label">SOUND OFF</span>
+      </button>
+    </footer>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
