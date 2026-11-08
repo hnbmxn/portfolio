@@ -26,8 +26,8 @@ const WORKS = [
 const COLS = 5;                 // PCの列数（参照元と同じ5列）
 const COLS_SP = 3;              // SP（幅640px以下）の列数
 const ROWS_VISIBLE = 4;         // 一度に見える行数。これより行が多いと、▲▼が出てスクロールする
-const GAP_X = 1.6;             // アイコンの横の間隔
-const GAP_Y = 1.5;             // アイコンの縦の間隔
+const GAP_X = 1.4;             // アイコンの横の間隔
+const GAP_Y = 1.35;             // アイコンの縦の間隔
 const TILT = 0.6;               // グリッドの床の傾き（ラジアン）。大きいほど上の行が奥へ遠ざかって小さくなる
 const ICON_SIZE = 1;            // アイコンの大きさ（どのアイコンも一番長い辺をこの長さにそろえる）
 const CUBE_TILT = [0.38, -0.62]; // 立方体アイコンの傾き [上下, 左右]。3つの面が見える角度
@@ -409,12 +409,15 @@ async function createView() {
     const hh = dist * tan;
     const hw = hh * aspect;
     if (L.sp) {
-      L.detail.set(0, hh * 0.4, camZ - dist);
+      L.detail.set(0, hh * 0.25, camZ - dist);   // 0.25 = 画面の中心からどれだけ上に置くか（大きいほど上）
       L.detailScale = Math.min(hh * 0.56, hw * 0.9) / ICON_SIZE;
     } else {
       L.detail.set(-hw * 0.46, 0, camZ - dist);
       L.detailScale = Math.min(hh * 0.72, hw * 0.55) / ICON_SIZE;
     }
+    // SP：詳細画面の文字をアイコンのすぐ下から始めるため、アイコンの下の端の位置（px）をCSSに渡す
+    const iconBottom = toScreen(L.detail.x, L.detail.y - (ICON_SIZE * L.detailScale) / 2, L.detail.z)[1];
+    detailEl.style.setProperty('--icon-bottom', `${Math.round(iconBottom)}px`);
 
     // ▲▼は一番上の行の上、一番下の行の下。Loading... はグリッドの中央
     const edge = ((L.rows - 1) / 2 + 0.72) * GAP_Y;

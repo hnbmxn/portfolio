@@ -120,7 +120,8 @@ body {
 /* ---------- SP（幅640px以下）：詳細は「上にアイコン、下に文字」 ---------- */
 @media (max-width: 640px) {
   .sel-title { max-width: 55%; }
-  .detail { top: auto; bottom: calc(max(clamp(14px, 2.6vw, 36px), env(safe-area-inset-bottom, 0px)) + 56px); left: var(--pad-x); right: var(--pad-x); transform: none; }
+  /* アイコンの下の端（--icon-bottom、works.jsが計算）から少しあけて文字を始める。+ 16px がアイコンとのすき間 */
+  .detail { top: calc(var(--icon-bottom, 45%) + 16px); left: var(--pad-x); right: var(--pad-x); transform: none; }
   .detail-desc { font-size: 13px; line-height: 1.75; }
 }
 
