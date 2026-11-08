@@ -6,6 +6,11 @@ const TUMBLE_SPEED = Math.PI / 2.8;       // 輪そのものが回る速さ（�
 const TRAIL = 0.4;                       // 光の尾（0で尾なし。1に近いほど長く残る）
 const LEAVE_MS = 1250;                    // 決定してから次の画面が出るまで
 
+// SP版（幅640px以下）：選択肢を縦に回るドラムにして、一周させる
+const WHEEL_ANGLE = 26;                   // 項目どうしの角度（度）。大きいほど上下の項目が強く傾く
+const WHEEL_RADIUS = 96;                  // ドラムの半径（px）。大きいほど項目の間隔が広がる
+const WHEEL_DRAG = 44;                    // 1項目ぶん回すのに指を動かす距離（px）
+
 // 玉の集まり方：等間隔 → 6つ → 等間隔 → 5つ → 等間隔 → 4つ → 等間隔 → 3つ → 等間隔 → 2つ → 等間隔 … をくり返す
 //  等間隔（7つ）の合間に集まる形。数字は輪の上に並ぶ塊ごとの玉の数で、合計を玉の数（7）にする
 const GATHER_STEPS = [
@@ -318,12 +323,161 @@ let current = 0;
 let mode = 'boot'; // boot → menu → leaving → page → intro → menu
 let orbs = null;
 
+// ===================== SP版の回る選択肢 =====================
+// 本物の3項目に、見た目だけの複製を3つ足して6段の輪にする。中央の上下2段ずつ（計5段）が見え、
+// 中央＝青、1段離れる＝グレー、2段離れる＝暗いグレーになる
+const wheel = (() => {
+  const mq = window.matchMedia('(max-width: 640px)'); // style.cssの切り替え幅と合わせる
+  const stageEl = document.querySelector('.stage');
+  const listEl = menuEl.querySelector('ul');
+  const lis = items.map((a) => a.parentElement);
+  const n = items.length;
+  const rad = (WHEEL_ANGLE * Math.PI) / 180;
+  let els = lis, clones = [];
+  let pos = 0;      // ドラムの回転位置（項目単位）。整数のとき、その項目がちょうど中央
+  let aim = 0;      // 回している先の位置
+  let tw = null;    // 回転中のGSAP
+  let drag = null;  // 指で回している最中の情報
+  let lastPointer = -1e9;
+
+  const api = { active: false };
+  const wrap = (i) => ((i % n) + n) % n;
+
+  // 位置をもとに、各段の傾き・高さ・透明度・色を決める
+  api.draw = () => {
+    if (!api.active) return;
+    const total = els.length;
+    els.forEach((li, b) => {
+      let off = (((b - pos) % total) + total) % total;
+      if (off >= total / 2) off -= total;              // 中央からの段数（-3〜+3）
+      const th = off * rad;
+      const y = WHEEL_RADIUS * Math.sin(th);
+      const z = WHEEL_RADIUS * (Math.cos(th) - 1);
+      li.style.transform = `translate(-50%, -50%) translate3d(0, ${y.toFixed(2)}px, ${z.toFixed(2)}px) rotateX(${(-off * WHEEL_ANGLE).toFixed(2)}deg)`;
+      li.style.opacity = String(Math.max(0, Math.min(1, (2.9 - Math.abs(off)) / 0.7)));
+      li.firstElementChild.dataset.dist = String(Math.min(Math.round(Math.abs(off)), 2));
+    });
+  };
+
+  // 位置を動かし、中央の項目が変わったら選択を切り替える（音と玉の形もここで変わる）
+  function setPos(p) {
+    pos = p;
+    api.draw();
+    const idx = wrap(Math.round(pos));
+    if (idx !== current && mode === 'menu') select(idx, { fromWheel: true });
+  }
+
+  function roll(target) {
+    aim = target;
+    if (tw) tw.kill();
+    const dist = Math.abs(target - pos);
+    if (!window.gsap || dist < 1e-3) { tw = null; setPos(target); return; }
+    const st = { p: pos };
+    tw = window.gsap.to(st, {
+      p: target, duration: reduceMotion ? 0.15 : Math.min(0.3 + 0.12 * dist, 0.9), ease: 'power3.out',
+      onUpdate: () => setPos(st.p), onComplete: () => { tw = null; },
+    });
+  }
+
+  api.stop = () => { if (tw) tw.kill(); tw = null; aim = pos; };
+  // i番目の項目へ、近いほうの向きに回す（キーボード・フォーカス用）
+  api.goTo = (i) => {
+    const base = Math.round(aim);
+    let d = wrap(i - base);
+    if (d > n / 2) d -= n;
+    roll(base + d);
+  };
+  // 選択中の項目がちょうど中央に来る位置へ合わせる（メニューに戻ったとき用）
+  api.sync = () => { api.stop(); const base = Math.round(pos); let d = wrap(current - base); if (d > n / 2) d -= n; pos = aim = base + d; api.draw(); };
+  api.recentPointer = () => performance.now() - lastPointer < 800;
+
+  function setActive(on) {
+    if (on === api.active) return;
+    api.active = on;
+    api.stop();
+    if (on) {
+      clones = lis.map((li) => {
+        const c = li.cloneNode(true);
+        c.setAttribute('aria-hidden', 'true');
+        c.inert = true;
+        c.firstElementChild.setAttribute('tabindex', '-1');
+        listEl.appendChild(c);
+        return c;
+      });
+      els = [...lis, ...clones];
+      pos = aim = current;
+      api.draw();
+    } else {
+      clones.forEach((c) => c.remove());
+      clones = []; els = lis;
+      lis.forEach((li) => { li.style.transform = ''; li.style.opacity = ''; });
+      paint();
+    }
+  }
+
+  // ---- 指・マウスで回す ----
+  stageEl.addEventListener('pointerdown', (e) => {
+    if (!api.active || mode !== 'menu' || !e.isPrimary || e.button > 0) return;
+    lastPointer = performance.now();
+    api.stop();
+    drag = { id: e.pointerId, y0: e.clientY, p0: pos, moved: false, hist: [[e.timeStamp, pos]] };
+    stageEl.setPointerCapture(e.pointerId);
+  });
+  stageEl.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    const dy = e.clientY - drag.y0;
+    if (!drag.moved && Math.abs(dy) < 8) return;     // 少し動いただけならタップ扱い
+    drag.moved = true;
+    setPos(drag.p0 - dy / WHEEL_DRAG);
+    drag.hist.push([e.timeStamp, pos]);
+    while (drag.hist.length > 2 && e.timeStamp - drag.hist[0][0] > 100) drag.hist.shift();
+  });
+  function release(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    const d = drag; drag = null;
+    lastPointer = performance.now();
+    if (e.type === 'pointercancel') { roll(Math.round(pos)); return; }
+    if (d.moved) {
+      // 指を離したときの勢いで少し回り続け、項目の位置でぴたりと止まる
+      const [t0, p0] = d.hist[0];
+      const v = e.timeStamp > t0 ? (pos - p0) / (e.timeStamp - t0) : 0; // 項目/ミリ秒
+      const fling = Math.max(-5, Math.min(5, v * 200));
+      roll(Math.round(pos + fling));
+      return;
+    }
+    // タップ：中央の項目なら決定、ほかの項目ならそこまで回す
+    const r = menuEl.getBoundingClientRect();
+    if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return;
+    const s = Math.max(-1, Math.min(1, (e.clientY - (r.top + r.height / 2)) / WHEEL_RADIUS));
+    const target = Math.round(pos + Math.asin(s) / rad);
+    if (target === Math.round(pos)) { setPos(target); decide(); }
+    else roll(target);
+  }
+  stageEl.addEventListener('pointerup', release);
+  stageEl.addEventListener('pointercancel', release);
+
+  // マウスホイール（幅の狭いPCのウィンドウ用）
+  let wheelLock = 0;
+  stageEl.addEventListener('wheel', (e) => {
+    if (!api.active || mode !== 'menu' || Math.abs(e.deltaY) < 4) return;
+    e.preventDefault();
+    if (performance.now() < wheelLock) return;
+    wheelLock = performance.now() + 140;
+    roll(Math.round(aim) + Math.sign(e.deltaY));
+  }, { passive: false });
+
+  mq.addEventListener('change', (e) => setActive(e.matches));
+  setActive(mq.matches);
+  return api;
+})();
+
 // 選択中＝青、1つ隣＝グレー、それより離れた項目＝暗いグレー
 function paint() {
+  if (wheel.active) { wheel.draw(); return; } // SP版はドラムの位置で色を決める
   items.forEach((a, i) => { a.dataset.dist = String(Math.min(Math.abs(i - current), 2)); });
 }
 
-// 選択中の項目の高さへ、玉を少し寄せる（縦並びのスマホでは寄せない）
+// 選択中の項目の高さへ、玉を少し寄せる（SP版は選択中がいつも中央なので寄せない）
 function nudgeFor(i) {
   if (window.matchMedia('(max-width: 640px)').matches) return 0;
   const m = menuEl.getBoundingClientRect();
@@ -333,7 +487,9 @@ function nudgeFor(i) {
 
 function select(i, opts = {}) {
   if (mode !== 'menu') return;
-  i = Math.max(0, Math.min(items.length - 1, i));
+  if (wheel.active && !opts.fromWheel) { wheel.goTo(i); return; } // SP版はドラムを回して選ぶ
+  const n = items.length;
+  i = wheel.active ? ((i % n) + n) % n : Math.max(0, Math.min(n - 1, i));
   if (opts.focus) items[i].focus({ preventScroll: true });
   if (i === current) return;
   current = i;
@@ -344,6 +500,7 @@ function select(i, opts = {}) {
 
 function decide(i = current) {
   if (mode !== 'menu') return;
+  if (wheel.active) wheel.stop();
   if (i !== current) { current = i; paint(); }
   mode = 'leaving';
   sound.decide();
@@ -370,6 +527,7 @@ function closePage() {
 function startMenu(focusItem) {
   mode = 'intro';
   menuEl.classList.add('is-hidden');
+  if (wheel.active) wheel.sync();
   if (orbs) orbs.intro(keys[current], nudgeFor(current));
   sound.swell();
   setTimeout(() => {
@@ -380,9 +538,13 @@ function startMenu(focusItem) {
 }
 
 items.forEach((a, i) => {
-  a.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') select(i); });
-  a.addEventListener('focus', () => select(i));
-  a.addEventListener('click', (e) => { e.preventDefault(); decide(i); });
+  a.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse' && !wheel.active) select(i); });
+  a.addEventListener('focus', () => { if (!(wheel.active && wheel.recentPointer())) select(i); });
+  a.addEventListener('click', (e) => {
+    e.preventDefault();
+    if (wheel.active && wheel.recentPointer()) return; // SP版のタップはドラム側で処理する
+    decide(i);
+  });
 });
 
 document.addEventListener('keydown', (e) => {

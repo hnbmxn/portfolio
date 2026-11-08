@@ -79,6 +79,15 @@ body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--pi
 .sound[aria-pressed="true"] .lamp { background: var(--sel); box-shadow: 0 0 8px var(--sel); }
 
 @media (max-width: 640px) {
-  .stage { flex-direction: row; gap: 36px; }
-  .orb-anchor { width: min(52vw, 200px); }
+  /* SP版：光の玉と選択肢を同じ位置に重ね、選択肢は縦に回るドラムにする（回す動きはmain.jsの「SP版の回る選択肢」） */
+  .stage { display: grid; place-items: center; gap: 0; touch-action: none; }
+  .orb-anchor, .menu { grid-area: 1 / 1; }
+  .orb-anchor { width: min(72vw, 280px); }
+  .menu {
+    position: relative; width: min(72vw, 280px); height: 220px;
+    perspective: 600px; user-select: none; -webkit-user-select: none;
+  }
+  .menu ul { position: absolute; inset: 0; display: block; transform-style: preserve-3d; }
+  .menu li { position: absolute; left: 50%; top: 50%; backface-visibility: hidden; will-change: transform, opacity; }
+  .menu a { transition: color 0.2s; text-shadow: 0 0 10px #000; -webkit-touch-callout: none; }
 }
