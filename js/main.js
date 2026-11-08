@@ -6,6 +6,10 @@ const TUMBLE_SPEED = Math.PI / 2.8;       // 輪そのものが回る速さ（�
 const TRAIL = 0.4;                       // 光の尾（0で尾なし。1に近いほど長く残る）
 const LEAVE_MS = 1250;                    // 決定してから次の画面が出るまで
 
+// 環境音（SOUND ON のときに流れる、海や風のような音）
+const AMBIENT_WAVE_SEC = 11;              // 波がふくらんで引くまでのおおよその秒数
+const AMBIENT_BRIGHT = 700;               // こもり具合（Hz）。小さいほど遠くの海、大きいほど近くの風
+
 // SP版（幅640px以下）：選択肢を縦に回るドラムにして、一周させる
 const WHEEL_ANGLE = 26;                   // 項目どうしの角度（度）。大きいほど上下の項目が強く傾く
 const WHEEL_RADIUS = 96;                  // ドラムの半径（px）。大きいほど項目の間隔が広がる
@@ -71,18 +75,46 @@ const sound = (() => {
     const ch = noiseBuf.getChannelData(0);
     for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
 
-    // 環境音：低い持続音をローパスでこもらせ、フィルターをゆっくり揺らす
-    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 380; lp.Q.value = 0.8;
-    ambGain = ctx.createGain(); ambGain.gain.value = 0;
-    lp.connect(ambGain).connect(master);
-    [[110, 'triangle', 0.55], [164.8, 'sine', 0.32], [220.7, 'sine', 0.16]].forEach(([f, type, v]) => {
-      const o = ctx.createOscillator(); o.type = type; o.frequency.value = f;
-      const g = ctx.createGain(); g.gain.value = v;
-      o.connect(g).connect(lp); o.start();
-    });
-    const lfo = ctx.createOscillator(); lfo.frequency.value = 0.12;
-    const lfoAmt = ctx.createGain(); lfoAmt.gain.value = 120;
-    lfo.connect(lfoAmt).connect(lp.frequency); lfo.start();
+    // 環境音：ノイズ（ザーッという音）をフィルターでこもらせ、音量と明るさをゆっくり揺らして波や風に聞かせる
+    const len = Math.floor(ctx.sampleRate * 6);
+    const ambBuf = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) {                // 左右で別々のノイズにして、音に広がりを出す
+      const d = ambBuf.getChannelData(c);
+      let b0 = 0, b1 = 0, b2 = 0;
+      for (let i = 0; i < len; i++) {            // ピンクノイズ：高い音ほど弱くなる、自然の音に近いザーッ
+        const w = Math.random() * 2 - 1;
+        b0 = 0.99765 * b0 + w * 0.0990460;
+        b1 = 0.96300 * b1 + w * 0.2965164;
+        b2 = 0.57000 * b2 + w * 1.0526913;
+        d[i] = (b0 + b1 + b2 + w * 0.1848) * 0.11;
+      }
+    }
+    const src = ctx.createBufferSource(); src.buffer = ambBuf; src.loop = true;
+    ambGain = ctx.createGain(); ambGain.gain.value = 0; ambGain.connect(master);
+
+    // 波：低めの音だけを残す。ふくらむと音量が上がり、少し明るくなる
+    const sea = ctx.createBiquadFilter(); sea.type = 'lowpass'; sea.frequency.value = AMBIENT_BRIGHT; sea.Q.value = 0.4;
+    const seaGain = ctx.createGain(); seaGain.gain.value = 1.15;
+    src.connect(sea).connect(seaGain).connect(ambGain);
+
+    // 風：高めの音を細く残し、その高さをゆらして「ヒュー」と流れる感じを出す
+    const air = ctx.createBiquadFilter(); air.type = 'bandpass'; air.frequency.value = 1600; air.Q.value = 0.9;
+    const airGain = ctx.createGain(); airGain.gain.value = 0.25;
+    src.connect(air).connect(airGain).connect(ambGain);
+
+    // ゆっくりした揺れ（LFO）。速さの違う揺れを重ねて、波のリズムが毎回同じにならないようにする
+    const lfo = (freq, amount, target) => {
+      const o = ctx.createOscillator(); o.frequency.value = freq;
+      const g = ctx.createGain(); g.gain.value = amount;
+      o.connect(g).connect(target); o.start();
+    };
+    const wave = 1 / AMBIENT_WAVE_SEC;
+    lfo(wave, 0.52, seaGain.gain);               // 波のふくらみ
+    lfo(wave * 1.618, 0.2, seaGain.gain);        // 少しずれた2つ目の波
+    lfo(wave, AMBIENT_BRIGHT * 0.5, sea.frequency); // ふくらむときに明るくなる
+    lfo(wave * 2.3, 700, air.frequency);         // 風の高さがゆれる
+    lfo(wave * 0.7, 0.12, airGain.gain);         // 風の強さがゆれる
+    src.start();
     return true;
   }
 
