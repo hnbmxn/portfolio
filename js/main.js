@@ -1,19 +1,30 @@
 // ===================== 調整用の値 =====================
 const ORB_COUNT = 7;                      // 玉の数（原作は7）
+const ORB_SIZE = 1.2;                     // 玉の大きさ（1で最初の大きさ）
 const ORB_SPEED = (Math.PI * 2) / 2.8;    // 玉が輪にそって進む速さ（約2.8秒で1周）
-const TUMBLE_SPEED = Math.PI / 2.2;       // 輪そのものが回る速さ（約2.2秒ごとに横向きになる）
-const TRAIL = 0.2;                       // 光の尾（0で尾なし。1に近いほど長く残る）
+const TUMBLE_SPEED = Math.PI / 2.8;       // 輪そのものが回る速さ（約2.2秒ごとに横向きになる）
+const TRAIL = 0.4;                       // 光の尾（0で尾なし。1に近いほど長く残る）
 const LEAVE_MS = 1250;                    // 決定してから次の画面が出るまで
 
-// 項目ごとの玉の形。カーソルを動かすと、ここの値へなめらかに移る
-//  spread : 1で輪全体に均等、小さいほど片側に寄る
-//  breathe: 間隔が自然に詰まったり広がったりする強さ
-//  clump  : 2つの塊に分かれる強さ（0〜0.5）
+// 玉の集まり方：等間隔 → 6つ → 等間隔 → 5つ → 等間隔 → 4つ → 等間隔 → 3つ → 等間隔 → 2つ → 等間隔 … をくり返す
+//  等間隔（7つ）の合間に集まる形。数字は輪の上に並ぶ塊ごとの玉の数で、合計を玉の数（7）にする
+const GATHER_STEPS = [
+  [1, 2, 1, 1, 1, 1],          // 6つ
+  [1, 2, 1, 2, 1],             // 5つ：2個の塊×2＋1個×3
+  [3, 1, 2, 1],                // 4つ
+  [3, 3, 1],                   // 3つ：3個の塊×2＋1個
+  [3, 4],                      // 2つ
+];
+const GATHER_HOLD = 1.2;       // 1つの形で止まっている秒数
+const GATHER_MOVE = 1.8;       // 次の形へ移り変わる秒数
+const GATHER_GAP = 0.1;       // 塊の中の玉どうしのすき間（0で完全に重なる）
+
+// 項目ごとの輪の形。カーソルを動かすと、ここの値へなめらかに移る
 //  radius : 輪の大きさ / tumble: 輪の回る速さの倍率 / axis: 回転軸の傾き
 const FORMATIONS = {
-  portfolio: { spread: 1.0,  breathe: 1.0, clump: 0.0,  radius: 1.0,  tumble: 1.0,  axis: 0.0 },
-  profile:   { spread: 0.6,  breathe: 0.12, clump: 0.0,  radius: 0.92, tumble: 0.75, axis: 0.9 },
-  contact:   { spread: 1.0,  breathe: 0.1,  clump: 0.42, radius: 0.86, tumble: 1.25, axis: -0.8 },
+  portfolio: { spread: 1.0, radius: 1.0,  tumble: 1.0,  axis: -0.8 },
+  profile:   { spread: 1.0, radius: 0.92, tumble: 0.75, axis: 0.3 },
+  contact:   { spread: 1.0, radius: 0.86, tumble: 1.25, axis: 0.8 },
 };
 // =====================================================
 
@@ -190,7 +201,7 @@ async function createOrbs() {
   });
 
   // GSAPで動かすのはこの数値だけ。玉の位置は毎フレームここから計算する
-  const P = { spread: 0, breathe: 0, clump: 0, radius: 0.6, tumble: 1, axis: 0, speed: 1, glow: 0, size: 1, nudgeY: 0 };
+  const P = { spread: 0, radius: 0.6, tumble: 1, axis: 0, speed: 1, glow: 0, size: 1, nudgeY: 0 };
   const motion = reduceMotion ? 0.3 : 1;
   let ringPhase = Math.random() * Math.PI * 2;
   let tumblePhase = 0.5;
@@ -199,6 +210,20 @@ async function createOrbs() {
   const euler = new THREE.Euler(0, 0, 0, 'ZYX');
   const quat = new THREE.Quaternion();
   const v = new THREE.Vector3();
+
+  // 塊に集まったときの、各玉の位置（角度）。sizes がなければ等間隔
+  function gatherAngles(sizes) {
+    const base = Array.from({ length: ORB_COUNT }, (_, i) => (i / ORB_COUNT) * Math.PI * 2);
+    if (!sizes || sizes.reduce((a, b) => a + b, 0) !== ORB_COUNT) return base;
+    const n = sizes.length;
+    const group = sizes.flatMap((len, g) => Array(len).fill(g));                              // 何番目の塊か
+    const offset = sizes.flatMap((len) => Array.from({ length: len }, (_, m) => m - (len - 1) / 2)); // 塊の中での位置
+    // 塊どうしは等間隔。全体の向きは、元の位置からの移動が一番少なくなるように合わせる
+    const shift = base.reduce((sum, b, i) => sum + b - (group[i] / n) * Math.PI * 2, 0) / ORB_COUNT;
+    return base.map((_, i) => (group[i] / n) * Math.PI * 2 + shift + offset[i] * GATHER_GAP);
+  }
+  const gather = GATHER_STEPS.flatMap((sizes) => [gatherAngles(), gatherAngles(sizes)]);
+  let gT = 0;
 
   let W = 1, H = 1, k = 1; // k = 画面1pxあたりの3D空間の長さ
   function resize() {
@@ -233,19 +258,24 @@ async function createOrbs() {
     const baseR = a.width * 0.42 * k;
     const R = Math.max(baseR * P.radius, 1e-4);
 
-    // 間隔の移動：輪に広がる割合と、2つに固まる強さを時間でゆらす
-    const spread = P.spread * (1 - P.breathe * (0.5 + 0.5 * Math.sin(t * 0.45)));
-    const clump = P.clump * (0.6 + 0.4 * Math.sin(t * 0.37 + 1.3));
+    // 間隔の移動：等間隔と GATHER_STEPS の形を交互に移っていく
+    gT = Math.max(0, gT + dt * motion * P.speed); // 最初の1フレームはdtがマイナスになることがあるので0未満にしない
+    const step = Math.floor(gT / (GATHER_HOLD + GATHER_MOVE));
+    const local = gT - step * (GATHER_HOLD + GATHER_MOVE);
+    const from = gather[step % gather.length];
+    const next = gather[(step + 1) % gather.length];
+    const x = Math.max(0, local - GATHER_HOLD) / GATHER_MOVE;
+    const p = 0.5 - 0.5 * Math.cos(Math.PI * x); // ゆっくり動き出して、ゆっくり止まる
 
     for (let i = 0; i < ORB_COUNT; i++) {
-      const rel = (i / ORB_COUNT) * Math.PI * 2 * spread;
-      const ang = ringPhase + rel - clump * Math.sin(2 * rel);
+      const rel = (from[i] + (next[i] - from[i]) * p) * P.spread;
+      const ang = ringPhase + rel;
       v.set(Math.cos(ang) * R, Math.sin(ang) * R, 0).applyQuaternion(quat);
       const d = (v.z / R + 1) / 2; // 0 = 奥、1 = 手前
       const { core, halo } = orbs[i];
       core.position.set(cx + v.x, cy + v.y, v.z);
       halo.position.copy(core.position);
-      const s = baseR * P.size;
+      const s = baseR * P.size * ORB_SIZE;
       // 奥の玉ほど芯が小さく暗く、にじみの割合が増える（＝ぼけて見える）
       core.scale.setScalar(s * 0.2 * (0.65 + 0.5 * d));
       halo.scale.setScalar(s * 0.8 * (0.85 + 0.3 * d));
@@ -271,6 +301,7 @@ async function createOrbs() {
       const f = FORMATIONS[key];
       Object.assign(P, { ...f, spread: 0, radius: f.radius * 0.6, glow: 0, size: 1, speed: 1, nudgeY: nudge });
       ringPhase = Math.random() * Math.PI * 2;
+      gT = 0;
       to(P, { glow: 1, duration: 0.5, ease: 'power1.out' });
       to(P, { spread: f.spread, radius: f.radius, duration: reduceMotion ? 0.4 : 1.4, ease: 'power2.out' });
     },
