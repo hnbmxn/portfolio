@@ -42,9 +42,9 @@ const AMBIENT = 3.2;            // 全体を照らす光の強さ。大きいほ
 const SIDE_LIGHT = 0.5;         // 斜め上からの光の強さ。大きいほど陰影がはっきりする
 
 // 音（HOMEで SOUND ON にしているときだけ鳴る）
-const POP_PITCH = 1200;         // 「ポッ」の高さ（Hz）。大きいほど高い
-const POP_VOLUME = 0.15;        // 「ポッ」の音量
-const FAN_VOLUME = 0.07;        // 「ファン」の音量
+const POP_PITCH = 523.25;       // 「ポッ」の高さ（Hz）。523.25＝ド（参照元と同じ高さ）
+const POP_VOLUME = 0.1;         // 「ポッ」の音量
+const FAN_VOLUME = 0.12;        // 「ファン」の音量（閉じる音はこの4割）
 // =====================================================
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -112,52 +112,60 @@ const sound = (() => {
   window.addEventListener('keydown', unlock, { capture: true });
   const ready = () => ctx && armed && wanted();
 
+  // サイン波の音を1つ鳴らす。points は [何秒後, 音量] の並びで、その順に音量が変わって消えていく
+  function partial(freq, points, t, dest, detune = 0) {
+    const o = ctx.createOscillator();
+    o.frequency.value = freq;
+    o.detune.value = detune;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    points.forEach(([sec, vol]) => g.gain.exponentialRampToValueAtTime(Math.max(vol, 0.0001), t + sec));
+    o.connect(g).connect(dest);
+    o.start(t);
+    o.stop(t + points[points.length - 1][0] + 0.05);
+  }
+
   return {
-    // ポッ：高い音が一瞬で下がる、泡がはじけるような短い音（選択が移ったとき）
+    // ポッ（カーソル移動）：高さの変わらない「ド」が一瞬強く鳴り、小さな余韻が残る。
+    // 7倍の高さ（約3.7kHz）の音を出だしだけ重ねて、鈴のようなキラッとした感じを出す
     pop() {
       if (!ready()) return;
       const t = ctx.currentTime;
-      const o = ctx.createOscillator();
-      o.type = 'sine';
-      o.frequency.setValueAtTime(POP_PITCH, t);
-      o.frequency.exponentialRampToValueAtTime(POP_PITCH * 0.45, t + 0.07);
-      const g = ctx.createGain();
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(POP_VOLUME, t + 0.005);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
-      o.connect(g).connect(out);
-      o.start(t);
-      o.stop(t + 0.1);
+      const v = POP_VOLUME;
+      partial(POP_PITCH, [[0.004, v], [0.085, v * 0.85], [0.1, v * 0.06], [0.9, 0.0001]], t, out);   // 0.1秒しっかり鳴って、すっと引く
+      partial(POP_PITCH * 7, [[0.002, v * 0.35], [0.03, v * 0.25], [0.045, v * 0.01], [0.5, 0.0001]], t, out);
     },
-    // ファン：こもった和音が、開くときは明るく上がり、閉じるときは暗く下がる
+    // ファン（詳細を開く・閉じる）：4度ずつ重ねた、浮遊感のある和音。音の高さは動かさない。
+    // 開く＝ラ♭・レ♭・ソ♭あたりで長く、閉じる＝ファ・シ♭・ミ♭あたりで短く（参照元の音から測った高さ）
     fan(open) {
       if (!ready()) return;
       const t = ctx.currentTime;
-      const dur = 0.55;
-      // 高い音を削るフィルター。削る境目を動かすと「ファン」と開く／閉じる感じになる
-      const lp = ctx.createBiquadFilter();
-      lp.type = 'lowpass';
-      lp.Q.value = 6;
-      lp.frequency.setValueAtTime(open ? 380 : 2600, t);
-      lp.frequency.exponentialRampToValueAtTime(open ? 2600 : 380, t + dur * 0.7);
-      const g = ctx.createGain();
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(FAN_VOLUME, t + 0.06);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-      lp.connect(g).connect(out);
-      const base = open ? 392 : 523.25; // 開く＝ソ、閉じる＝ド から
-      [1, 1.26, 1.5].forEach((ratio) => {        // ド・ミ・ソの関係の和音
-        [-7, 7].forEach((cents) => {             // 少しずらした2本を重ねて、音に厚みを出す
-          const o = ctx.createOscillator();
-          o.type = 'sawtooth';
-          o.detune.value = cents;
-          o.frequency.setValueAtTime(base * ratio, t);
-          o.frequency.exponentialRampToValueAtTime(base * ratio * (open ? 1.06 : 0.94), t + dur);
-          o.connect(lp);
-          o.start(t);
-          o.stop(t + dur + 0.05);
-        });
+      const chord = open
+        ? [[415.3, 0.45], [553.7, 1], [730, 0.4], [364, 0.1]]   // [高さHz, 強さ]
+        : [[174.6, 1], [230, 0.8], [310, 0.65]];
+      const sparkle = open                          // 出だしだけ鳴る高い音（明るさ） [高さHz, 強さ]
+        ? [[1210, 0.08], [1238, 0.08], [1423, 0.08], [2340, 0.08]]
+        : [[985, 0.04], [1750, 0.03], [2050, 0.03], [2400, 0.08]];
+      const len = open ? 1.5 : 0.75;                 // 消えるまでの秒数
+      const hold = open ? 0.35 : 0.3;                // 強く鳴っている長さ
+      const vol = FAN_VOLUME * (open ? 1 : 0.4);     // 閉じる音は、開く音より小さい
+
+      // 1秒に20回ほど音量を揺らして、「ファン」という震えを出す
+      const bus = ctx.createGain();
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = 20;
+      const depth = ctx.createGain();
+      depth.gain.value = 0.3;
+      lfo.connect(depth).connect(bus.gain);
+      bus.connect(out);
+      lfo.start(t);
+      lfo.stop(t + len + 0.1);
+
+      chord.forEach(([f, a]) => {
+        // 少しだけ高さをずらした2本を重ねて、ゆっくりうなる揺らぎを出す
+        [-6, 6].forEach((cents) => partial(f, [[0.04, (vol * a) / 2], [hold, vol * a * 0.18], [len, 0.0001]], t, bus, cents));
       });
+      sparkle.forEach(([f, a]) => partial(f, [[0.03, vol * a], [hold, 0.0001]], t, bus));
     },
   };
 })();
