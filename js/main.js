@@ -353,7 +353,7 @@ const wheel = (() => {
       const th = off * rad;
       const y = WHEEL_RADIUS * Math.sin(th);
       const z = WHEEL_RADIUS * (Math.cos(th) - 1);
-      li.style.transform = `translate(-50%, -50%) translate3d(0, ${y.toFixed(2)}px, ${z.toFixed(2)}px) rotateX(${(-off * WHEEL_ANGLE).toFixed(2)}deg)`;
+      li.style.transform = `translate(0, -50%) translate3d(0, ${y.toFixed(2)}px, ${z.toFixed(2)}px) rotateX(${(-off * WHEEL_ANGLE).toFixed(2)}deg)`;
       li.style.opacity = String(Math.max(0, Math.min(1, (2.9 - Math.abs(off)) / 0.7)));
       li.firstElementChild.dataset.dist = String(Math.min(Math.round(Math.abs(off)), 2));
     });
@@ -441,7 +441,7 @@ const wheel = (() => {
       // 指を離したときの勢いで少し回り続け、項目の位置でぴたりと止まる
       const [t0, p0] = d.hist[0];
       const v = e.timeStamp > t0 ? (pos - p0) / (e.timeStamp - t0) : 0; // 項目/ミリ秒
-      const fling = Math.max(-5, Math.min(5, v * 200));
+      const fling = Math.max(-3, Math.min(3, v * 150)); // 勢いで余分に回る量（最大3項目）
       roll(Math.round(pos + fling));
       return;
     }
