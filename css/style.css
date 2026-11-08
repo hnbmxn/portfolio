@@ -79,6 +79,6 @@ body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--pi
 .sound[aria-pressed="true"] .lamp { background: var(--sel); box-shadow: 0 0 8px var(--sel); }
 
 @media (max-width: 640px) {
-  .stage { flex-direction: low; gap: 36px; }
+  .stage { flex-direction: row; gap: 36px; }
   .orb-anchor { width: min(52vw, 200px); }
 }
