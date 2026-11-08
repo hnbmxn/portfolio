@@ -35,8 +35,16 @@ const POP_STAGGER = 0.08;       // 登場のとき、アイコンが1つ出る�
 const LIGHT_POWER = 1;          // 選択中のライトの強さ（0で消える）
 const DETAIL_SPIN = 0.9;        // 詳細画面でアイコンが回る速さ（ラジアン/秒。6.28で1秒に1周）
 const DIM = 0.18;               // 詳細画面で、選んでいないアイコンをどこまで薄くするか（0で消える、1でそのまま）
-const GRID_BG = ['#8f8f8a', '#5f5e58', '#4a4943', '#1b1a15'];   // 一覧の背景 [左上, 右上, 左下, 右下]
+const GRID_BG = ['#787878', '#26261a', '#474747', '#12120c'];   // 一覧の背景 [左上, 右上, 左下, 右下]（参照画像の4隅から拾った色）
 const DETAIL_BG = ['#b8283f', '#2a9c48', '#2b2bc8', '#1a8c6a']; // 詳細画面の背景（作品ごとに bg で変えられる）
+const RENDER_WIDTH = 640;       // 3Dを描く横の解像度（px）。小さいほど昔のゲームのようににじむ。0で画面どおりくっきり
+const AMBIENT = 3.2;            // 全体を照らす光の強さ。大きいほど陰影が弱く、のっぺり明るくなる
+const SIDE_LIGHT = 0.5;         // 斜め上からの光の強さ。大きいほど陰影がはっきりする
+
+// 音（HOMEで SOUND ON にしているときだけ鳴る）
+const POP_PITCH = 1200;         // 「ポッ」の高さ（Hz）。大きいほど高い
+const POP_VOLUME = 0.15;        // 「ポッ」の音量
+const FAN_VOLUME = 0.07;        // 「ファン」の音量
 // =====================================================
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -76,6 +84,83 @@ function fade(el, on, delay = 0) {
   else el.style.opacity = on ? '1' : '0';
 }
 const wait = (sec) => new Promise((r) => setTimeout(r, sec * 1000 * SPEED));
+
+// ===================== 音（Web Audioで合成。音声ファイルなし） =====================
+// HOMEの SOUND ON / OFF は sessionStorage に残してあり、ONのときだけ鳴らす
+const sound = (() => {
+  let ctx = null, out = null, armed = false;
+  const wanted = () => { try { return sessionStorage.getItem('omori-sound') === 'on'; } catch (err) { return false; } };
+
+  function init() {
+    if (ctx || !wanted()) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    ctx = new AC();
+    out = ctx.createGain();
+    out.connect(ctx.destination);
+    armed = ctx.state === 'running'; // HOMEで操作していれば、そのまま鳴らせるブラウザもある（Chromeなど）
+  }
+  // ブラウザは、このページでクリックかキー操作があるまで音を止めておくことがある。最初の操作で鳴らせる状態にする
+  function unlock() {
+    init();
+    if (!ctx) return;
+    armed = true;
+    if (ctx.state !== 'running') ctx.resume();
+  }
+  init();
+  window.addEventListener('pointerdown', unlock, { capture: true });
+  window.addEventListener('keydown', unlock, { capture: true });
+  const ready = () => ctx && armed && wanted();
+
+  return {
+    // ポッ：高い音が一瞬で下がる、泡がはじけるような短い音（選択が移ったとき）
+    pop() {
+      if (!ready()) return;
+      const t = ctx.currentTime;
+      const o = ctx.createOscillator();
+      o.type = 'sine';
+      o.frequency.setValueAtTime(POP_PITCH, t);
+      o.frequency.exponentialRampToValueAtTime(POP_PITCH * 0.45, t + 0.07);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(POP_VOLUME, t + 0.005);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.09);
+      o.connect(g).connect(out);
+      o.start(t);
+      o.stop(t + 0.1);
+    },
+    // ファン：こもった和音が、開くときは明るく上がり、閉じるときは暗く下がる
+    fan(open) {
+      if (!ready()) return;
+      const t = ctx.currentTime;
+      const dur = 0.55;
+      // 高い音を削るフィルター。削る境目を動かすと「ファン」と開く／閉じる感じになる
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.Q.value = 6;
+      lp.frequency.setValueAtTime(open ? 380 : 2600, t);
+      lp.frequency.exponentialRampToValueAtTime(open ? 2600 : 380, t + dur * 0.7);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(FAN_VOLUME, t + 0.06);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      lp.connect(g).connect(out);
+      const base = open ? 392 : 523.25; // 開く＝ソ、閉じる＝ド から
+      [1, 1.26, 1.5].forEach((ratio) => {        // ド・ミ・ソの関係の和音
+        [-7, 7].forEach((cents) => {             // 少しずらした2本を重ねて、音に厚みを出す
+          const o = ctx.createOscillator();
+          o.type = 'sawtooth';
+          o.detune.value = cents;
+          o.frequency.setValueAtTime(base * ratio, t);
+          o.frequency.exponentialRampToValueAtTime(base * ratio * (open ? 1.06 : 0.94), t + dur);
+          o.connect(lp);
+          o.start(t);
+          o.stop(t + dur + 0.05);
+        });
+      });
+    },
+  };
+})();
 
 // HOMEへ戻る。HOMEから来たときは「ブラウザの戻る」と同じ動きにして、履歴を増やさない
 const HOME_URL = new URL('../', location.href);
@@ -150,8 +235,8 @@ async function createView() {
   }
 
   // ---- 光：全体を照らす光と、選択中のアイコンだけを照らすライト ----
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x4d4a42, 2.2));
-  const sun = new THREE.DirectionalLight(0xffffff, 1.6);
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8880, AMBIENT));
+  const sun = new THREE.DirectionalLight(0xffffff, SIDE_LIGHT);
   sun.position.set(-2, 4, 6);
   scene.add(sun);
   const lamp = new THREE.PointLight(0xffffff, 0, 3.4, 1);
@@ -172,7 +257,7 @@ async function createView() {
 
   // ---- アイコン ----
   // 仮の立方体に番号を描くので、先にフォントを読み込んでおく（1.5秒待っても来なければそのまま進む）
-  if (document.fonts) await Promise.race([document.fonts.load('48px "Press Start 2P"'), wait(1.5)]).catch(() => {});
+  if (document.fonts) await Promise.race([document.fonts.load('800 48px "M PLUS Rounded 1c"'), wait(1.5)]).catch(() => {});
 
   const gltfLoader = new GLTFLoader();
   const texLoader = new THREE.TextureLoader();
@@ -204,10 +289,10 @@ async function createView() {
     g.lineWidth = 12;
     g.strokeRect(16, 16, 224, 224);
     g.fillStyle = '#fff';
-    g.font = '60px "Press Start 2P", monospace';
+    g.font = '800 96px "M PLUS Rounded 1c", sans-serif';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillText(String(i + 1).padStart(2, '0'), 132, 136);
+    g.fillText(String(i + 1).padStart(2, '0'), 128, 134);
     return new THREE.CanvasTexture(c);
   }
 
@@ -292,7 +377,8 @@ async function createView() {
   function layout() {
     W = canvas.clientWidth || window.innerWidth;
     H = canvas.clientHeight || window.innerHeight;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    // RENDER_WIDTH があれば、その横幅ぶんの細かさで描いてから画面いっぱいに引き伸ばす（にじんだ昔の画質になる）
+    renderer.setPixelRatio(RENDER_WIDTH > 0 ? Math.min(RENDER_WIDTH / W, 2) : Math.min(window.devicePixelRatio || 1, 2));
     renderer.setSize(W, H, false);
     const aspect = W / H;
     L.sp = mqSP.matches;
@@ -510,6 +596,7 @@ function select(i, opts = {}) {
     selTitle.textContent = WORKS[i].title;
     view.ensureVisible();
     view.flash();
+    sound.pop();
   }
   if (opts.focus) links[i].focus({ preventScroll: true });
 }
@@ -526,6 +613,7 @@ function open() {
   detailTitle.textContent = w.title;
   detailDesc.textContent = w.desc;
   goLink.href = w.url || '#';
+  sound.fan(true);
   view.open();
   view.updateArrows();
   fade(headEl, false);
@@ -538,6 +626,7 @@ function open() {
 function close() {
   if (mode !== 'detail' && mode !== 'opening') return;
   mode = 'closing';
+  sound.fan(false);
   fade(detailEl, false);
   fade(headEl, true, 0.35);
   setTimeout(() => { if (mode !== 'detail' && mode !== 'opening') detailEl.hidden = true; }, 300 * SPEED);
@@ -548,6 +637,7 @@ function close() {
 function leave() {
   if (mode !== 'grid' && mode !== 'intro') return;
   mode = 'leaving';
+  sound.fan(false);
   loadingEl.classList.remove('is-on');
   view.updateArrows();
   view.leave();

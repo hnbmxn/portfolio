@@ -10,10 +10,15 @@
   --go-glow: rgba(86, 184, 255, 0.65);
   --arrow: #2f62ff;            /* 上下にまだ行があるときの▲▼ */
   --outline: rgba(0, 0, 0, 0.8);
-  --pixel: "Press Start 2P", "Hiragino Sans", "Noto Sans JP", ui-monospace, monospace;
-  --body: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  /* 文字：PS2のような丸みのある太いゴシック */
+  --round: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  --body: var(--round);
+  --silver: linear-gradient(180deg, #ffffff 0%, #ececec 45%, #a8a8a8 100%);   /* 白〜灰の文字（上が明るく下が暗い） */
+  --gold: linear-gradient(180deg, #fff9b0 0%, #f2df4a 50%, #c8a514 100%);     /* 黄色の文字 */
   /* 文字のふち（PS2の文字は黒いふちどり付き） */
   --edge: 1px 1px 0 var(--outline), -1px 1px 0 var(--outline), 1px -1px 0 var(--outline), -1px -1px 0 var(--outline), 0 2px 6px rgba(0, 0, 0, 0.45);
+  /* グラデーション文字用のふち。text-shadow だと透明な文字の中に透けるので、filter で外側だけに付ける */
+  --edge-filter: drop-shadow(1.5px 0 0 #000) drop-shadow(-1.5px 0 0 #000) drop-shadow(0 1.5px 0 #000) drop-shadow(0 -1.5px 0 #000) drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
   --pad-x: max(16px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
 }
 
@@ -36,17 +41,27 @@ body {
 }
 .card { display: flex; align-items: flex-start; gap: 12px; }
 .card-mark { flex: none; width: clamp(16px, 1.8vw, 24px); aspect-ratio: 1; background: #050505; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12); }
-.card-name { margin: 0; font-family: var(--pixel); font-size: clamp(11px, 1.15vw, 16px); font-weight: 400; line-height: 1.2; text-shadow: var(--edge); }
-.card-sub { margin: 6px 0 0; font-family: var(--pixel); font-size: clamp(8px, 0.75vw, 10px); line-height: 1.2; opacity: 0.85; text-shadow: var(--edge); }
+.card-name { margin: 0; font-size: clamp(16px, 1.75vw, 26px); line-height: 1.15; }
+.card-sub { margin: 2px 0 0; font-size: clamp(11px, 0.95vw, 14px); line-height: 1.2; }
 .sel-title {
   margin: 0; max-width: 48%; text-align: right;
-  font-family: var(--pixel); font-size: clamp(11px, 1.3vw, 18px); line-height: 1.5; color: var(--yellow); text-shadow: var(--edge);
+  font-size: clamp(16px, 1.9vw, 28px); line-height: 1.25;
 }
+
+/* グラデーション文字：背景のグラデーションを文字の形で切り抜き、filter で黒いふちを付ける。
+   background-size の高さを1行ぶんにして、2行になっても行ごとに上が明るく下が暗くなるようにする */
+.card-name, .card-sub, .loading, .detail-label, .guide-label, .sel-title, .detail-title {
+  font-family: var(--round); font-weight: 800; letter-spacing: 0.04em;
+  background: var(--silver) 0 0 / 100% 1.25em repeat-y;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: var(--edge-filter);
+}
+.sel-title, .detail-title { background-image: var(--gold); }
 
 /* ---------- Loading... と ▲▼（位置はworks.jsがグリッドに合わせて動かす） ---------- */
 .loading {
   position: absolute; left: 50%; top: 50%; margin: 0; transform: translate(-50%, -50%);
-  font-family: var(--pixel); font-size: clamp(12px, 1.4vw, 20px); text-shadow: var(--edge); white-space: nowrap;
+  font-size: clamp(17px, 1.9vw, 28px); line-height: 1.25; white-space: nowrap;
   opacity: 0; transition: opacity 0.25s;
 }
 .loading.is-on { opacity: 1; }
@@ -73,17 +88,14 @@ body {
   display: flex; flex-direction: column; align-items: center; gap: clamp(10px, 1.3vw, 16px);
   text-align: center;
 }
-.detail-label { margin: 0; font-family: var(--pixel); font-size: clamp(9px, 0.85vw, 12px); text-shadow: var(--edge); }
-.detail-title {
-  margin: 0; font-family: var(--pixel); font-size: clamp(14px, 1.7vw, 24px); font-weight: 400; line-height: 1.5;
-  color: var(--yellow); text-shadow: var(--edge);
-}
+.detail-label { margin: 0; font-size: clamp(12px, 1.05vw, 16px); line-height: 1.25; }
+.detail-title { margin: 0; font-size: clamp(20px, 2.3vw, 34px); line-height: 1.25; }
 .detail-desc {
-  margin: 0; max-width: 26em; font-size: clamp(13px, 1.05vw, 15px); line-height: 1.85; text-shadow: var(--edge);
+  margin: 0; max-width: 26em; font-size: clamp(13px, 1.05vw, 15px); font-weight: 500; line-height: 1.85; text-shadow: var(--edge);
 }
 .detail-go {
   margin-top: clamp(8px, 1.6vw, 22px); padding: 6px 14px;
-  font-size: clamp(16px, 1.5vw, 21px); font-weight: 700; letter-spacing: 0.08em; line-height: 1.4;
+  font-family: var(--round); font-size: clamp(18px, 1.7vw, 24px); font-weight: 800; letter-spacing: 0.08em; line-height: 1.4;
   color: var(--go); text-decoration: none; outline: none;
   text-shadow: var(--edge), 0 0 14px var(--go-glow);
 }
@@ -97,8 +109,8 @@ body {
 }
 .guide-btn {
   display: inline-flex; align-items: center; gap: 8px; padding: 8px 10px;
-  font: 700 clamp(13px, 1vw, 15px)/1 var(--body); letter-spacing: 0.06em; color: var(--fg);
-  background: transparent; border: 0; cursor: pointer; text-shadow: var(--edge);
+  font-size: clamp(15px, 1.25vw, 19px); line-height: 1; color: var(--fg);
+  background: transparent; border: 0; cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
 .guide-btn:hover { color: #fff; filter: brightness(1.15); }

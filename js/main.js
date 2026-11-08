@@ -596,7 +596,23 @@ soundBtn.addEventListener('click', async () => {
   const state = await sound.set(!sound.on);
   soundBtn.setAttribute('aria-pressed', String(state));
   soundLabel.textContent = state ? 'SOUND ON' : 'SOUND OFF';
+  try { sessionStorage.setItem('omori-sound', state ? 'on' : 'off'); } catch (err) { /* 保存できない環境では何もしない */ }
 });
+
+// Portfolioなどから戻ってきたとき、SOUND ON のままにする（ブラウザの制限で、音は最初のクリックかキー操作から鳴る）
+try {
+  if (sessionStorage.getItem('omori-sound') === 'on') {
+    soundBtn.setAttribute('aria-pressed', 'true');
+    soundLabel.textContent = 'SOUND ON';
+    const resumeSound = () => {
+      window.removeEventListener('pointerdown', resumeSound, true);
+      window.removeEventListener('keydown', resumeSound, true);
+      if (!sound.on) sound.set(true);
+    };
+    window.addEventListener('pointerdown', resumeSound, true);
+    window.addEventListener('keydown', resumeSound, true);
+  }
+} catch (err) { /* 読めない環境では、いつもどおりOFFから */ }
 
 // ===================== 起動 =====================
 paint();
