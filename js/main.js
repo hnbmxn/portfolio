@@ -542,6 +542,9 @@ function decide(i = current) {
 }
 
 function openPage() {
+  // リンク先が別ページ（#で始まらない）なら、そのページへ移る（Portfolio → works/）
+  const href = items[current].getAttribute('href');
+  if (!href.startsWith('#')) { location.href = href; return; }
   pageTitle.textContent = items[current].textContent;
   pageEl.hidden = false;
   if (window.gsap) window.gsap.fromTo(pageEl, { opacity: 0 }, { opacity: 1, duration: 0.35, ease: 'power1.out' });
@@ -605,6 +608,11 @@ if (first === 'timeout') {
   orbsLoading.then((o) => { if (o) { orbs = o; o.intro(keys[current], nudgeFor(current)); } });
 }
 
+
+// 別ページから「ブラウザの戻る」で帰ってきたとき（前の状態のまま表示される）、メニューを出し直す
+window.addEventListener('pageshow', (e) => {
+  if (e.persisted && mode === 'leaving') startMenu(true);
+});
 const realign = () => { if (orbs && mode === 'menu') orbs.nudge(nudgeFor(current)); };
 if (document.fonts) document.fonts.ready.then(realign);
 window.addEventListener('resize', realign);

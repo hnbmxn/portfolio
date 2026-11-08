@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Portfolio | Omori Portfolio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+  <link rel="stylesheet" href="../css/works.css">
+  <script>document.documentElement.classList.add('js');</script>
+</head>
+<body>
+  <!-- 背景（4隅の色のグラデーション）とアイコンはすべてこのcanvasにWebGLで描く -->
+  <canvas id="scene" aria-hidden="true"></canvas>
+
+  <div class="screen">
+    <header class="head">
+      <div class="card">
+        <span class="card-mark" aria-hidden="true"></span>
+        <div>
+          <h1 class="card-name">Portfolio</h1>
+          <p class="card-sub" id="count"></p>
+        </div>
+      </div>
+      <p class="sel-title" id="sel-title" aria-hidden="true"></p>
+    </header>
+
+    <p class="loading" id="loading" aria-hidden="true">Loading...</p>
+    <span class="arrow" id="arrow-up" aria-hidden="true"></span>
+    <span class="arrow is-down" id="arrow-down" aria-hidden="true"></span>
+
+    <!-- 作品一覧。ふだんは見えない（キーボード・読み上げ用）。WebGLが使えないときはこの一覧をそのまま表示する -->
+    <nav class="works" aria-label="作品一覧">
+      <ul id="work-list"></ul>
+    </nav>
+
+    <!-- 決定後の詳細画面 -->
+    <section class="detail" id="detail" hidden aria-labelledby="detail-title">
+      <p class="detail-label">Portfolio</p>
+      <h2 class="detail-title" id="detail-title"></h2>
+      <p class="detail-desc" id="detail-desc"></p>
+      <a class="detail-go" id="detail-go" href="#">見に行く</a>
+    </section>
+
+    <!-- 操作ガイド（日本版PS2に合わせて ○決定 / ×戻る）。クリック・タップでも押せる -->
+    <footer class="guide">
+      <button class="guide-btn" id="btn-ok" type="button">
+        <svg class="mark" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="6.5" fill="none" stroke="#e8484e" stroke-width="3"/></svg>決定
+      </button>
+      <button class="guide-btn" id="btn-back" type="button">
+        <svg class="mark" viewBox="0 0 20 20" aria-hidden="true"><path d="M4.5 4.5l11 11M15.5 4.5l-11 11" stroke="#5b8de8" stroke-width="3" stroke-linecap="round"/></svg>戻る
+      </button>
+    </footer>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module" src="../js/works.js"></script>
+</body>
+</html>

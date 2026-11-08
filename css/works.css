@@ -1,0 +1,124 @@
+/* Portfolio（作品一覧）：PS2のメモリーカード画面が参考。
+   背景とアイコンはcanvas（WebGL）、文字やボタンはHTMLで上に重ねる */
+[hidden] { display: none !important; }
+
+:root {
+  color-scheme: dark;
+  --fg: #f4f4f2;
+  --yellow: #f2df4a;           /* 選択中の作品名（PS2の黄色い文字） */
+  --go: #56b8ff;               /* 詳細画面の「見に行く」 */
+  --go-glow: rgba(86, 184, 255, 0.65);
+  --arrow: #2f62ff;            /* 上下にまだ行があるときの▲▼ */
+  --outline: rgba(0, 0, 0, 0.8);
+  --pixel: "Press Start 2P", "Hiragino Sans", "Noto Sans JP", ui-monospace, monospace;
+  --body: system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  /* 文字のふち（PS2の文字は黒いふちどり付き） */
+  --edge: 1px 1px 0 var(--outline), -1px 1px 0 var(--outline), 1px -1px 0 var(--outline), -1px -1px 0 var(--outline), 0 2px 6px rgba(0, 0, 0, 0.45);
+  --pad-x: max(16px, env(safe-area-inset-left, 0px), env(safe-area-inset-right, 0px));
+}
+
+html, body { height: 100%; }
+body {
+  margin: 0; overflow: hidden; color: var(--fg); font-family: var(--body);
+  background: #000;            /* 最初は黒（HOMEから続けて見えるように）。WebGL側で灰色の背景へ明るくする */
+}
+
+#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; z-index: 0; touch-action: none; }
+
+.screen { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+.screen button, .screen a { pointer-events: auto; }
+
+/* ---------- 左上：カード名 / 右上：選択中の作品名 ---------- */
+.head {
+  position: absolute; top: clamp(18px, 3.4vw, 44px); left: var(--pad-x); right: var(--pad-x);
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 24px;
+  padding-inline: clamp(0px, calc(3.33vw - 16px), 32px);
+}
+.card { display: flex; align-items: flex-start; gap: 12px; }
+.card-mark { flex: none; width: clamp(16px, 1.8vw, 24px); aspect-ratio: 1; background: #050505; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12); }
+.card-name { margin: 0; font-family: var(--pixel); font-size: clamp(11px, 1.15vw, 16px); font-weight: 400; line-height: 1.2; text-shadow: var(--edge); }
+.card-sub { margin: 6px 0 0; font-family: var(--pixel); font-size: clamp(8px, 0.75vw, 10px); line-height: 1.2; opacity: 0.85; text-shadow: var(--edge); }
+.sel-title {
+  margin: 0; max-width: 48%; text-align: right;
+  font-family: var(--pixel); font-size: clamp(11px, 1.3vw, 18px); line-height: 1.5; color: var(--yellow); text-shadow: var(--edge);
+}
+
+/* ---------- Loading... と ▲▼（位置はworks.jsがグリッドに合わせて動かす） ---------- */
+.loading {
+  position: absolute; left: 50%; top: 50%; margin: 0; transform: translate(-50%, -50%);
+  font-family: var(--pixel); font-size: clamp(12px, 1.4vw, 20px); text-shadow: var(--edge); white-space: nowrap;
+  opacity: 0; transition: opacity 0.25s;
+}
+.loading.is-on { opacity: 1; }
+.arrow {
+  position: absolute; left: 0; top: 0; width: 0; height: 0;
+  border-left: 9px solid transparent; border-right: 9px solid transparent; border-bottom: 11px solid var(--arrow);
+  filter: drop-shadow(0 0 3px rgba(60, 110, 255, 0.6));
+  opacity: 0; transition: opacity 0.25s;
+}
+.arrow.is-down { border-bottom: 0; border-top: 11px solid var(--arrow); }
+.arrow.is-on { opacity: 1; }
+
+/* ---------- 作品一覧（ふだんは見えない。キーボード・読み上げ用） ---------- */
+.works {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap;
+}
+.works ul { list-style: none; margin: 0; padding: 0; }
+
+/* ---------- 詳細画面（右半分に作品名・紹介文・見に行く） ---------- */
+.detail {
+  position: absolute; top: 50%; left: 50%; right: max(var(--pad-x), 6vw);
+  transform: translateY(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: clamp(10px, 1.3vw, 16px);
+  text-align: center;
+}
+.detail-label { margin: 0; font-family: var(--pixel); font-size: clamp(9px, 0.85vw, 12px); text-shadow: var(--edge); }
+.detail-title {
+  margin: 0; font-family: var(--pixel); font-size: clamp(14px, 1.7vw, 24px); font-weight: 400; line-height: 1.5;
+  color: var(--yellow); text-shadow: var(--edge);
+}
+.detail-desc {
+  margin: 0; max-width: 26em; font-size: clamp(13px, 1.05vw, 15px); line-height: 1.85; text-shadow: var(--edge);
+}
+.detail-go {
+  margin-top: clamp(8px, 1.6vw, 22px); padding: 6px 14px;
+  font-size: clamp(16px, 1.5vw, 21px); font-weight: 700; letter-spacing: 0.08em; line-height: 1.4;
+  color: var(--go); text-decoration: none; outline: none;
+  text-shadow: var(--edge), 0 0 14px var(--go-glow);
+}
+.detail-go:hover { color: #8fd0ff; }
+.detail-go:focus-visible { box-shadow: 0 0 0 2px var(--go); }
+
+/* ---------- 下：操作ガイド（○決定 / ×戻る） ---------- */
+.guide {
+  position: absolute; left: 0; right: 0; bottom: max(clamp(14px, 2.6vw, 36px), env(safe-area-inset-bottom, 0px));
+  display: flex; justify-content: center; gap: clamp(20px, 3vw, 44px);
+}
+.guide-btn {
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 10px;
+  font: 700 clamp(13px, 1vw, 15px)/1 var(--body); letter-spacing: 0.06em; color: var(--fg);
+  background: transparent; border: 0; cursor: pointer; text-shadow: var(--edge);
+  -webkit-tap-highlight-color: transparent;
+}
+.guide-btn:hover { color: #fff; filter: brightness(1.15); }
+.guide-btn:focus-visible { outline: 2px solid var(--go); outline-offset: 2px; }
+.mark { width: 1.25em; height: 1.25em; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.7)); }
+
+/* ---------- SP（幅640px以下）：詳細は「上にアイコン、下に文字」 ---------- */
+@media (max-width: 640px) {
+  .sel-title { max-width: 55%; }
+  .detail { top: auto; bottom: calc(max(clamp(14px, 2.6vw, 36px), env(safe-area-inset-bottom, 0px)) + 56px); left: var(--pad-x); right: var(--pad-x); transform: none; }
+  .detail-desc { font-size: 13px; line-height: 1.75; }
+}
+
+/* ---------- WebGLが使えないとき：作品一覧をそのまま表示する ---------- */
+.no-webgl body { background: radial-gradient(ellipse at 20% 10%, #8c8c88, #4a4944 55%, #1d1c18); }
+.no-webgl .works {
+  position: absolute; inset: 120px var(--pad-x) 90px; width: auto; height: auto; clip-path: none;
+  overflow: auto; white-space: normal; pointer-events: auto;
+}
+.no-webgl .works ul { display: grid; gap: 12px; max-width: 640px; margin: 0 auto; }
+.no-webgl .works a { display: block; padding: 12px 14px; color: var(--fg); text-decoration: none; background: rgba(0, 0, 0, 0.35); text-shadow: var(--edge); }
+.no-webgl .works a:hover, .no-webgl .works a:focus-visible { color: var(--yellow); }
+.no-webgl .sel-title, .no-webgl .loading, .no-webgl #btn-ok { display: none; }
