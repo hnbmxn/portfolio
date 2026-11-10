@@ -1,3 +1,5 @@
+import { createProfile } from './profile.js';
+
 // ===================== 調整用の値 =====================
 const ORB_COUNT = 7;                      // 玉の数（原作は7）
 const ORB_SIZE = 1.5;                     // 玉の大きさ（1で最初の大きさ）
@@ -48,6 +50,7 @@ const backBtn = $('#back-btn');
 const soundBtn = $('#sound-btn');
 const soundLabel = $('#sound-label');
 const anchorEl = $('#orb-anchor');
+const profile = createProfile({ onBack: () => closePage() }); // Profile（履歴書風の画面、js/profile.js）
 
 // GSAPが読み込めなかったときは、アニメーションなしで値だけ切り替える
 const TWEEN_KEYS = ['duration', 'ease', 'delay', 'overwrite', 'onComplete'];
@@ -545,6 +548,7 @@ function openPage() {
   // リンク先が別ページ（#で始まらない）なら、そのページへ移る（Portfolio → works/）
   const href = items[current].getAttribute('href');
   if (!href.startsWith('#')) { location.href = href; return; }
+  if (href === '#profile') { mode = 'page'; profile.open(); return; }
   pageTitle.textContent = items[current].textContent;
   pageEl.hidden = false;
   if (window.gsap) window.gsap.fromTo(pageEl, { opacity: 0 }, { opacity: 1, duration: 0.35, ease: 'power1.out' });
@@ -556,6 +560,7 @@ function closePage() {
   if (mode !== 'page') return;
   sound.back();
   pageEl.hidden = true;
+  profile.close();
   startMenu(true);
 }
 
