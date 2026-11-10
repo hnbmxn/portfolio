@@ -1,8 +1,8 @@
 // ===================== 調整用の値 =====================
 const ORB_COUNT = 7;                      // 玉の数（原作は7）
-const ORB_SIZE = 1.2;                     // 玉の大きさ（1で最初の大きさ）
+const ORB_SIZE = 1.5;                     // 玉の大きさ（1で最初の大きさ）
 const ORB_SPEED = (Math.PI * 2) / 2.8;    // 玉が輪にそって進む速さ（約2.8秒で1周）
-const TUMBLE_SPEED = Math.PI / 2.8;       // 輪そのものが回る速さ（約2.2秒ごとに横向きになる）
+const TUMBLE_SPEED = Math.PI / 4.0;       // 輪そのものが回る速さ（約2.2秒ごとに横向きになる）
 const TRAIL = 0.4;                       // 光の尾（0で尾なし。1に近いほど長く残る）
 const LEAVE_MS = 1250;                    // 決定してから次の画面が出るまで
 
@@ -25,13 +25,13 @@ const GATHER_STEPS = [
   [3, 4],                      // 2つ
 ];
 const GATHER_HOLD = 1.2;       // 1つの形で止まっている秒数
-const GATHER_MOVE = 1.8;       // 次の形へ移り変わる秒数
-const GATHER_GAP = 0.1;       // 塊の中の玉どうしのすき間（0で完全に重なる）
+const GATHER_MOVE = 2.0;       // 次の形へ移り変わる秒数
+const GATHER_GAP = 0.05;       // 塊の中の玉どうしのすき間（0で完全に重なる）
 
 // 項目ごとの輪の形。カーソルを動かすと、ここの値へなめらかに移る
 //  radius : 輪の大きさ / tumble: 輪の回る速さの倍率 / axis: 回転軸の傾き
 const FORMATIONS = {
-  portfolio: { spread: 1.0, radius: 1.0,  tumble: 1.0,  axis: -0.8 },
+  portfolio: { spread: 1.0, radius: 1.2, tumble: 1.25,  axis: 0.5 },
   profile:   { spread: 1.0, radius: 0.92, tumble: 0.75, axis: 0.3 },
   contact:   { spread: 1.0, radius: 0.86, tumble: 1.25, axis: 0.8 },
 };
