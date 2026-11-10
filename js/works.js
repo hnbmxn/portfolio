@@ -33,6 +33,9 @@ const ICON_SIZE = 1;            // アイコンの大きさ（どのアイコン
 const CUBE_TILT = [0.38, -0.62]; // 立方体アイコンの傾き [上下, 左右]。3つの面が見える角度
 const POP_STAGGER = 0.08;       // 登場のとき、アイコンが1つ出るごとの間隔（秒）
 const LIGHT_POWER = 1;          // 選択中のライトの強さ（0で消える）
+const GLOW_SIZE = 2.6;          // 下の光の大きさ（アイコン何個ぶんか）
+const GLOW_SOFT = 4.0;          // 光の消え方。小さいほど外までふんわり広がり、大きいほど中心に集まる
+const GLOW_GRAIN = 0.1;         // ざらつきの強さ（0でなし）
 const DETAIL_SPIN = 0.9;        // 詳細画面でアイコンが回る速さ（ラジアン/秒。6.28で1秒に1周）
 const DIM = 0.18;               // 詳細画面で、選んでいないアイコンをどこまで薄くするか（0で消える、1でそのまま）
 const GRID_BG = ['#787878', '#26261a', '#474747', '#12120c'];   // 一覧の背景 [左上, 右上, 左下, 右下]（参照画像の4隅から拾った色）
@@ -250,17 +253,57 @@ async function createView() {
   const lamp = new THREE.PointLight(0xffffff, 0, 3.4, 1);
   scene.add(lamp);
 
-  // 選択中のアイコンの後ろに灯る光（ぼかした白い丸を加算合成で重ねる）
-  const glowCanvas = document.createElement('canvas');
-  glowCanvas.width = glowCanvas.height = 128;
-  const gctx = glowCanvas.getContext('2d');
-  const grd = gctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-  [[0, 'rgba(255,255,255,1)'], [0.18, 'rgba(255,255,250,0.85)'], [0.45, 'rgba(255,250,235,0.28)'], [1, 'rgba(255,250,235,0)']].forEach(([o, c]) => grd.addColorStop(o, c));
-  gctx.fillStyle = grd;
-  gctx.fillRect(0, 0, 128, 128);
-  const glowTex = new THREE.CanvasTexture(glowCanvas);
-  glowTex.colorSpace = THREE.SRGBColorSpace;
-  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
+  // 選択中のアイコンの後ろに灯る光。
+  // 中心から外へガウス曲線でなめらかに消し、1ピクセルごとに動く粒（ざらつき）を混ぜる
+  const glow = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1),
+    new THREE.ShaderMaterial({
+      uniforms: {
+        uOpacity: { value: 0 },
+        uTime: { value: 0 },
+        uSoft: { value: GLOW_SOFT },
+        uGrain: { value: GLOW_GRAIN },
+      },
+      vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          // 板がいつもカメラの方を向くようにする（Spriteと同じ動き）
+          vec4 mv = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+          mv.xy += position.xy * vec2(length(modelMatrix[0].xyz), length(modelMatrix[1].xyz));
+          gl_Position = projectionMatrix * mv;
+        }`,
+      fragmentShader: /* glsl */ `
+        uniform float uOpacity;
+        uniform float uTime;
+        uniform float uSoft;
+        uniform float uGrain;
+        varying vec2 vUv;
+
+        // 座標から0〜1の乱数を作る
+        float hash(vec2 p) {
+          vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+          p3 += dot(p3, p3.yzx + 33.33);
+          return fract((p3.x + p3.y) * p3.z);
+        }
+
+        void main() {
+          vec2 p = vUv * 2.0 - 1.0;                  // 板の中心が0、端が1
+          float r = length(p);
+          // ガウス曲線で消えていく光。端（r=1）では必ず0にして、板の四角い縁を出さない
+          float a = exp(-r * r * uSoft) * (1.0 - smoothstep(0.6, 1.0, r));
+          // ざらつき：ピクセルごとの乱数を1秒に24回入れ替える
+          float tick = mod(floor(uTime * 24.0), 64.0);
+          float n = hash(gl_FragCoord.xy + tick * vec2(37.0, 17.0)) - 0.5;
+          // 明るいところほど粒を強く。1/255ぶんの揺らぎでグラデーションの縞も消す
+          a = max(a + n * (a * uGrain + 1.0 / 255.0), 0.0);
+          gl_FragColor = vec4(1.0, 0.98, 0.94, a * uOpacity);
+        }`,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    })
+  );
   scene.add(glow);
 
   // ---- アイコン ----
@@ -517,8 +560,9 @@ async function createView() {
     lampAt.lerp(cur.position, 1 - Math.exp(-dt * 22));
     const power = LIGHT_POWER * G.on * G.flash * (1 - D.t) * (1 + 0.05 * Math.sin(t * 3.2));
     glow.position.set(lampAt.x, lampAt.y - 0.24 * ICON_SIZE, lampAt.z - 0.5 * ICON_SIZE);
-    glow.scale.setScalar(ICON_SIZE * 2.1 * Math.min(1, items[sel].pop));
-    glow.material.opacity = Math.min(1, 0.85 * power);
+    glow.scale.setScalar(ICON_SIZE * GLOW_SIZE * Math.min(1, items[sel].pop));
+    glow.material.uniforms.uOpacity.value = Math.min(1, 0.85 * power);
+    glow.material.uniforms.uTime.value = t;
     lamp.position.set(lampAt.x, lampAt.y + 0.35 * ICON_SIZE, lampAt.z + 1.0 * ICON_SIZE);
     lamp.intensity = 7 * power;
 

@@ -31,9 +31,9 @@ const GATHER_GAP = 0.05;       // 塊の中の玉どうしのすき間（0で完
 // 項目ごとの輪の形。カーソルを動かすと、ここの値へなめらかに移る
 //  radius : 輪の大きさ / tumble: 輪の回る速さの倍率 / axis: 回転軸の傾き
 const FORMATIONS = {
-  portfolio: { spread: 1.0, radius: 1.2, tumble: 1.25,  axis: 0.5 },
-  profile:   { spread: 1.0, radius: 0.92, tumble: 0.75, axis: 0.3 },
-  contact:   { spread: 1.0, radius: 0.86, tumble: 1.25, axis: 0.8 },
+  portfolio: { spread: 1.0, radius: 1.25, tumble: 1.25,  axis: 0.5 },
+  profile:   { spread: 1.0, radius: 1.25, tumble: 1.25, axis: 0.3 },
+  contact:   { spread: 1.0, radius: 1.25, tumble: 1.25, axis: 0.8 },
 };
 // =====================================================
 
