@@ -161,7 +161,9 @@ body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--pi
 .pf-back { align-self: flex-end; }
 
 @media (max-width: 640px) {
-  .pf-top { grid-template-columns: 1fr 38%; }
+    /* SP：上から「写真 → 記入欄」の縦並び。写真は3:4のまま、元の大きさ（300px）までで止める */
+  .pf-top { grid-template-columns: 1fr; }
+  .pf-photo { order: -1; justify-self: center; align-self: start; width: min(100%, 300px); }
   .pf-row { grid-template-columns: 3.9em 1fr; gap: 0.4em; padding-inline: 0.55em; }
   .pf-gender { padding: 0 0.7em; }
   .pf-about { padding: 0.6em 0.75em 0.8em; }
