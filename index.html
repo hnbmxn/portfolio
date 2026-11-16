@@ -13,13 +13,32 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&text=ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,:;!%3F'%22()%5B%5D%2F-_%26%20&display=swap">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap">
   <link rel="stylesheet" href="css/style.css">
+  <!-- ローディング画面の踊る人（23コマを横に並べた1枚の画像）。ほかより先に読み込みはじめる -->
+  <link rel="preload" href="assets/loading/dance.png" as="image">
   <script>
     // JSが動く環境では、玉が輪になるまでメニューを隠しておく（読み込みに失敗しても4秒後には必ず表示）
     document.documentElement.classList.add('js');
     setTimeout(function () { var m = document.getElementById('menu'); if (m) m.classList.remove('pre'); }, 4000);
+    // ブラウザの「戻る」で帰ってきたときは、ローディング画面を出さない（js/loader.js）
+    try {
+      var nav = performance.getEntriesByType('navigation')[0];
+      if (nav && nav.type === 'back_forward') document.documentElement.classList.add('no-loader');
+    } catch (e) { /* 調べられない環境では、いつもどおり出す */ }
   </script>
+  <script src="js/loader.js" defer></script>
 </head>
 <body>
+  <!-- ローディング画面：読み込みが終わると自動で消えて、HOMEが始まる（動きは js/loader.js、見た目は css/style.css） -->
+  <div class="loader" id="loader">
+    <div class="loader-dancer" aria-hidden="true"></div>
+    <div class="loader-meter">
+      <div class="loader-bar" role="progressbar" aria-label="読み込み中" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <span class="loader-fill"></span>
+      </div>
+      <span class="loader-num" aria-hidden="true">0%</span>
+    </div>
+  </div>
+
   <canvas id="orbs" aria-hidden="true"></canvas>
 
   <div class="screen">

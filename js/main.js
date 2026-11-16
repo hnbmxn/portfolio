@@ -624,6 +624,8 @@ paint();
 const orbsLoading = createOrbs().catch((err) => { console.warn('光の玉を表示できませんでした', err); return null; });
 const first = await Promise.race([orbsLoading, new Promise((r) => setTimeout(() => r('timeout'), 4000))]);
 if (first !== 'timeout') orbs = first;
+// ローディング画面が消えはじめてから、玉を登場させる（js/loader.js）
+if (window.omoriLoader) await window.omoriLoader.finish();
 startMenu(false);
 if (first === 'timeout') {
   orbsLoading.then((o) => { if (o) { orbs = o; o.intro(keys[current], nudgeFor(current)); } });

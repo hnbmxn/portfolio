@@ -168,3 +168,44 @@ body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--pi
   .pf-gender { padding: 0 0.7em; }
   .pf-about { padding: 0.6em 0.75em 0.8em; }
 }
+
+/* ---------- ローディング画面（動きは js/loader.js）。JSが動かない環境と、「戻る」で帰ってきたときは出さない ---------- */
+.loader { display: none; }
+.js .loader {
+  position: fixed; inset: 0; z-index: 10;
+  display: grid; place-content: center; justify-items: center; gap: 28px;
+  background: var(--bg);
+  transition: opacity 0.5s ease;     /* 消える速さ。js/loader.js の FADE と合わせる */
+}
+.js.no-loader .loader { display: none; }
+.loader.is-done { opacity: 0; pointer-events: none; }
+
+/* 踊る人：横に並べた23コマ（1コマ128×183）を、steps() で1コマずつずらして見せる。
+   画像を2倍で書き出しても、background-size で表示の大きさに合わせるので、そのまま差し替えられる */
+.loader-dancer {
+  --frames: 23;          /* コマ数 */
+  --frame-time: 0.18s;   /* 1コマの表示時間。小さくすると速くなる */
+  --fw: 128px;           /* 表示する1コマの幅 */
+  --fh: 183px;           /* 表示する1コマの高さ */
+  width: var(--fw); height: var(--fh);
+  background: url("../assets/loading/dance.png") 0 0 / calc(var(--fw) * var(--frames)) var(--fh) no-repeat;
+  animation: loader-dance calc(var(--frame-time) * var(--frames)) steps(var(--frames)) infinite;
+}
+@keyframes loader-dance { to { background-position: calc(var(--fw) * var(--frames) * -1) 0; } }
+
+/* バーと％ */
+.loader-meter { display: flex; align-items: center; gap: 14px; }
+.loader-bar { width: 160px; height: 6px; background: var(--line); overflow: hidden; }
+.loader-fill { display: block; height: 100%; background: var(--sel); transform: scaleX(0); transform-origin: left center; }
+.loader-num {
+  min-width: 4ch; text-align: right;
+  font-family: "Press Start 2P", "DotGothic16", monospace; /* 数字と％は DotGothic16（Press Start 2P は英字だけ読み込んでいるため。HOMEと同じ振り分け） */
+  font-size: 12px; line-height: 1; color: var(--ui-on);
+  visibility: hidden;                /* 文字が読み込めるまで隠す（別の書体で一瞬出るのを防ぐ） */
+}
+.loader.is-font .loader-num { visibility: visible; }
+
+/* 動きを減らす設定のときは、1コマ目で止める */
+@media (prefers-reduced-motion: reduce) {
+  .loader-dancer { animation: none; }
+}
