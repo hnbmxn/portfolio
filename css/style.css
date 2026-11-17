@@ -184,7 +184,7 @@ body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--pi
    画像を2倍で書き出しても、background-size で表示の大きさに合わせるので、そのまま差し替えられる */
 .loader-dancer {
   --frames: 23;          /* コマ数 */
-  --frame-time: 0.18s;   /* 1コマの表示時間。小さくすると速くなる */
+  --frame-time: 0.17s;   /* 1コマの表示時間。小さくすると速くなる */
   --fw: 128px;           /* 表示する1コマの幅 */
   --fh: 183px;           /* 表示する1コマの高さ */
   width: var(--fw); height: var(--fh);
