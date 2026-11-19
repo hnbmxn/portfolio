@@ -3,23 +3,18 @@
 //  desc  : 紹介文（詳細画面に出る。2〜3行くらい）
 //  url   : 「見に行く」の行き先
 //  model : 3Dアイコン（.glb）のファイル名。あればこれを使う。アニメーションが入っていれば常に再生する
+//  rot   : 3Dアイコンの向き [上下, 左右]（ラジアン）。書かなければ正面（+Z）を向いたまま
+//  size  : アイコンの大きさの倍率。形が細くて小さく見えるときに大きくする。書かなければ 1
 //  icon  : 平面アイコン（画像）のファイル名。model がないときに立方体の面に貼る
 //          model も icon もないときは、番号入りの仮の立方体になる
 //  bg    : 詳細画面の背景の4隅の色 ['左上', '右上', '左下', '右下']。書かなければ DETAIL_BG の色
 const ASSET_DIR = '../assets/works/';     // model / icon を置くフォルダ（works/index.html から見た場所）
 const WORKS = [
-  { title: '作品01', desc: 'ここに作品の紹介文が入ります。どんな作品で、何を担当したかを2〜3行でまとめます。', url: '#', model: '', icon: '' },
+  { title: '作品01', desc: 'ここに作品の紹介文が入ります。どんな作品で、何を担当したかを2〜3行でまとめます。', url: '#', model: 'thai_elephant.glb', rot: [0.15, 0.9], size: 1.35, icon: '' },
   { title: '作品02', desc: 'ここに作品の紹介文が入ります。どんな作品で、何を担当したかを2〜3行でまとめます。', url: '#', model: '', icon: '' },
   { title: '作品03', desc: 'ここに作品の紹介文が入ります。どんな作品で、何を担当したかを2〜3行でまとめます。', url: '#', model: '', icon: '' },
   { title: '作品04', desc: 'ここに作品の紹介文が入ります。どんな作品で、何を担当したかを2〜3行でまとめます。', url: '#', model: '', icon: '' },
   { title: '作品05', desc: 'ここに作品の紹介文が入ります。どんな作品で、何を担当したかを2〜3行でまとめます。', url: '#', model: '', icon: '' },
-  { title: '作品06', desc: 'ここに作品の紹介文が入ります。どんな作品で、何を担当したかを2〜3行でまとめます。', url: '#', model: '', icon: '' },
-  { title: '作品07', desc: 'ここに作品の紹介文が入ります。どんな作品で、何を担当したかを2〜3行でまとめます。', url: '#', model: '', icon: '' },
-  { title: '作品08', desc: 'ここに作品の紹介文が入ります。どんな作品で、何を担当したかを2〜3行でまとめます。', url: '#', model: '', icon: '' },
-  { title: '作品09', desc: 'ここに作品の紹介文が入ります。どんな作品で、何を担当したかを2〜3行でまとめます。', url: '#', model: '', icon: '' },
-  { title: '作品10', desc: 'ここに作品の紹介文が入ります。どんな作品で、何を担当したかを2〜3行でまとめます。', url: '#', model: '', icon: '' },
-  { title: '作品11', desc: 'ここに作品の紹介文が入ります。どんな作品で、何を担当したかを2〜3行でまとめます。', url: '#', model: '', icon: '' },
-  { title: '作品12', desc: 'ここに作品の紹介文が入ります。どんな作品で、何を担当したかを2〜3行でまとめます。', url: '#', model: '', icon: '' },
 ];
 
 // ===================== 調整用の値 =====================
@@ -43,6 +38,7 @@ const DETAIL_BG = ['#b8283f', '#2a9c48', '#2b2bc8', '#1a8c6a']; // 詳細画面�
 const RENDER_WIDTH = 640;       // 3Dを描く横の解像度（px）。小さいほど昔のゲームのようににじむ。0で画面どおりくっきり
 const AMBIENT = 3.2;            // 全体を照らす光の強さ。大きいほど陰影が弱く、のっぺり明るくなる
 const SIDE_LIGHT = 0.5;         // 斜め上からの光の強さ。大きいほど陰影がはっきりする
+const ENV_POWER = 1;            // 3Dアイコン（.glb）に映り込む景色の明るさ。金属が暗いときは上げる
 
 // 音（HOMEで SOUND ON にしているときだけ鳴る）
 const POP_PITCH = 523.25;       // 「ポッ」の高さ（Hz）。523.25＝ド（参照元と同じ高さ）
@@ -204,6 +200,7 @@ let sel = 0;
 async function createView() {
   const THREE = await import('three');
   const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
+  const { RoomEnvironment } = await import('three/addons/environments/RoomEnvironment.js');
 
   let renderer;
   try {
@@ -214,6 +211,10 @@ async function createView() {
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 200); // 画角を広めにして、奥の行ほど小さく見えるようにする
+
+  // 金属は周りの景色を映して色が出るので、映り込み用に「明るい部屋」の景色を1枚作っておく。
+  // scene.environment にすると立方体まで明るくなるため、3Dアイコン（.glb）の素材にだけ使う
+  const envMap = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
 
   // ---- 背景：画面いっぱいの板に、4隅の色をなめらかにつないで塗る（PS2の背景と同じしくみ） ----
   const bgU = { tl: { value: new THREE.Color(0, 0, 0) }, tr: { value: new THREE.Color(0, 0, 0) }, bl: { value: new THREE.Color(0, 0, 0) }, br: { value: new THREE.Color(0, 0, 0) } };
@@ -369,6 +370,15 @@ async function createView() {
       try {
         const gltf = await gltfLoader.loadAsync(ASSET_DIR + w.model);
         obj = gltf.scene;
+        if (w.rot) obj.rotation.set(w.rot[0], w.rot[1], 0);
+        // 映り込みを設定する（ないと金属が真っ黒に見える）
+        obj.traverse((o) => {
+          if (!o.isMesh) return;
+          (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => {
+            m.envMap = envMap;
+            m.envMapIntensity = ENV_POWER;
+          });
+        });
         // glbに入っている動きは、すべてくり返し再生する（毎フレーム mixer.update で進める）
         if (gltf.animations.length) {
           it.mixer = new THREE.AnimationMixer(obj);
@@ -380,6 +390,7 @@ async function createView() {
     }
     if (!obj) obj = await makeCube(w, it.i);
     const holder = fit(obj);
+    holder.scale.multiplyScalar(w.size || 1);
     // 詳細画面でほかのアイコンを薄くするため、素材を半透明にできる設定にしておく
     holder.traverse((o) => {
       if (!o.isMesh) return;
